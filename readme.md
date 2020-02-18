@@ -1,5 +1,3 @@
-This project has the following spec:
-
 Two robotic arms will use a "nail gun" to nail together two planks and place them in a specific position that they can only achieve if they are nailed together
 
 Reward function should take into account:
