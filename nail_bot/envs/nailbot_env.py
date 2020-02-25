@@ -12,7 +12,7 @@ import pybullet as p
 import pybullet_data
 '''
 TO DO
-Add saving mechanism?
+
 '''
 '''
 TO IMPROVE
