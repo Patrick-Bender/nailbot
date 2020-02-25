@@ -1,9 +1,9 @@
 import gym
 import nail_bot
-from stable_baselines import DDPG
+from stable_baselines import PPO1
 
 env = gym.make('nailbot-v0')
-model = DDPG.load('ddpg_nailbot', env = env)
+model = PPO1.load('ppo1_nailbot', env = env)
 obs = env.reset()
 while True:
     action, _states = model.predict(obs)

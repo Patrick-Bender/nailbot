@@ -1,13 +1,13 @@
 import gym
-from stable_baselines import DDPG, results_plotter
-from stable_baselines.ddpg.policies import MlpPolicy
-from stable_baselines.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise, AdaptiveParamNoiseSpec
+from stable_baselines import PPO1, results_plotter
+from stable_baselines.common.policies import MlpPolicy
 from stable_baselines.bench import Monitor
 from stable_baselines.results_plotter import load_results, ts2xy
 import matplotlib.pyplot as plt
 import nail_bot
 import numpy as np
 import os
+import tensorflow as tf
 
 best_mean_reward, n_steps = -np.inf, 0
 
@@ -30,25 +30,26 @@ def callback(lcl, glb):
 log_dir = 'tmp/'
 os.makedirs(log_dir, exist_ok = True)
 
+#create custom policy- MLP Policy isn't big enough
+
+policy_kwargs = dict(act_fun=tf.nn.leaky_relu, net_arch=[256,256,256,256])
+
 #Create and train the model
 env = gym.make('nailbot-v0')
 env = Monitor(env, log_dir, allow_early_resets=True)
-n_actions = env.action_space.shape[-1]
-param_noise = None
-action_noise = OrnsteinUhlenbeckActionNoise(mean=np.zeros(n_actions), sigma=float(0.5) * np.ones(n_actions))
-model = DDPG(MlpPolicy, env, verbose=1, param_noise=param_noise, action_noise=action_noise)
+model = PPO1(MlpPolicy, env, policy_kwargs=policy_kwargs, verbose=1)
 try:
-    model = DDPG.load('ddpg_nailbot', env = env)
+    model = PPO1.load('ppo1_nailbot', env = env)
 except:
-    print("Could not find ddpg_nailbot file, creating new one")
-total_timesteps = 1000000
+    print("Could not find ppo1_nailbot file, creating new one")
+total_timesteps = 100000
 model.learn(total_timesteps=total_timesteps)
 #save model
-model.save('ddpg_nailbot')
+model.save('ppo1_nailbot')
 print("Done training")
 
 #show plot results
-results_plotter.plot_results([log_dir], total_timesteps, results_plotter.X_TIMESTEPS, 'DDPG Nailbot')
+results_plotter.plot_results([log_dir], total_timesteps, results_plotter.X_TIMESTEPS, 'PPO1 Nailbot')
 plt.show()
 
         

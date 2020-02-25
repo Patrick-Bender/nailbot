@@ -34,13 +34,14 @@ class NailbotEnv(gym.GoalEnv):
         self.action_space = spaces.Box(np.array(kuka_lower_bound + gripper_lower_bound), np.array(kuka_upper_bound + gripper_upper_bound)) 
         obs_shape = 108
         self.observation_space = spaces.Box(-1*np.inf*np.ones(obs_shape), np.inf*np.ones(obs_shape))
-        self.physicsClient = p.connect(p.GUI)
+        self.physicsClient = p.connect(p.DIRECT)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         self._seed()
     def _step(self,action):
         self._assign_target_position(action)
-        p.stepSimulation()
-        #time.sleep(1./240.)
+        for i in range(100):
+            p.stepSimulation()
+            #time.sleep(1./240.)
         self._observation = self._compute_observation()
         reward = self._compute_reward()
         done = self._compute_done()
@@ -114,7 +115,7 @@ class NailbotEnv(gym.GoalEnv):
         return 1/distance
     def _compute_done(self):
         reward = self._compute_reward()
-        return reward>1000 or self._envStepCounter >= 15000
+        return reward>1000 or self._envStepCounter >= 45000
     def _seed(self, seed = None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
