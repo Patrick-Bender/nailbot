@@ -3,6 +3,7 @@ import math
 import numpy as np
 import random
 import time
+from math import sin, cos
 
 import gym
 from gym import error,spaces,utils
@@ -24,17 +25,28 @@ class NailbotEnv(gym.GoalEnv):
     metadata={'render.modes':['human']}
     def __init__(self):
         self._observation = []
+        '''
         #need to get action space, 8 gripper joints, 7 kuka joints
         #first 7 are kuka joints- all revolute(?)
         kuka_lower_bound = 7*[-math.pi] 
         kuka_upper_bound = 7*[math.pi]
+        #getting rid of gripper for now- will come back
         #gripper bounds are bounds for prismatic joints, fixed are set to 0
         gripper_lower_bound = [0, -0.055, -20, -20, -0.01, 0, -0.01, 0]
         gripper_upper_bound = [0, 0.001, 20, 20, 0.05, 0, 0.05, 0]
-        self.action_space = spaces.Box(np.array(kuka_lower_bound + gripper_lower_bound), np.array(kuka_upper_bound + gripper_upper_bound)) 
-        obs_shape = 108
+        '''
+        #note: the position of the action space is in spherical coordinates, which is changed to cartesian in assign_target_position
+        pos_lower_bound = (0.2, -3.14, 0)
+        pos_upper_bound = (0.8, 3.14, 3.14/2)
+        #similarly, orientation is in euler axes, and is then change to quaternions in assign_target_pos
+        orn_lower_bound = (-3.14, -3.14, -3.14)
+        orn_upper_bound = (3.14, 3.14,3.14)
+        lower_bound = np.array(pos_lower_bound + orn_lower_bound)
+        upper_bound = np.array(pos_upper_bound + orn_upper_bound)
+        self.action_space = spaces.Box(lower_bound, upper_bound) 
+        obs_shape = 10
         self.observation_space = spaces.Box(-1*np.inf*np.ones(obs_shape), np.inf*np.ones(obs_shape))
-        self.physicsClient = p.connect(p.DIRECT)
+        self.physicsClient = p.connect(p.GUI)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         self._seed()
     def _step(self,action):
@@ -83,39 +95,45 @@ class NailbotEnv(gym.GoalEnv):
     def _render(self, mode = 'human', close=False):
         pass
     def _assign_target_position(self, action):
-        p.setJointMotorControlArray(bodyUniqueId = self.kukaId, jointIndices = range(p.getNumJoints(self.kukaId)), controlMode = p.POSITION_CONTROL, targetPositions = action[:p.getNumJoints(self.kukaId)], forces = p.getNumJoints(self.kukaId)*[60])
-        p.setJointMotorControlArray(bodyUniqueId = self.gripperId, jointIndices = range(p.getNumJoints(self.gripperId)), controlMode = p.POSITION_CONTROL, targetPositions = action[p.getNumJoints(self.kukaId):p.getNumJoints(self.kukaId)+p.getNumJoints(self.gripperId)])
+        #action is target pos and orn
+        num_joints = p.getNumJoints(self.kukaId)
+        #remember that these need to be converted back to cartesian/quaternion coordinates
+        targetPos = action[0:3]
+        r = targetPos[0]
+        theta = targetPos[1]
+        phi = targetPos[2]
+        targetPos = [r*sin(phi)*cos(theta), r*sin(phi)*sin(theta), r*cos(phi)]
+        targetOrn = action[3:6]
+        targetOrn = p.getQuaternionFromEuler(targetOrn)
+        targetPositions = p.calculateInverseKinematics(self.kukaId, 6, targetPos, targetOrn)
+        p.setJointMotorControlArray(bodyUniqueId = self.kukaId, jointIndices = range(num_joints), controlMode = p.POSITION_CONTROL, targetPositions = targetPositions, forces = num_joints*[100])
         return(p.getNumJoints(self.kukaId)+1, p.getNumJoints(self.kukaId)+p.getNumJoints(self.gripperId), p.getNumJoints(self.gripperId))
     def _compute_observation(self):
-        #includes positions of the kuka, cube, and gripper, and whether or not the gripper is contacting the cube
+        #Observation space is cube position and position/orn of end effectuator
         cubePos, _ = p.getBasePositionAndOrientation(self.cubeId)
         observation = []
         for i in range (len(cubePos)):
             observation.append(cubePos[i])
-        for i in range (p.getNumJoints(self.kukaId)):
-            kukaPos,kukaOrn,_,_,_,_ = p.getLinkState(self.kukaId, i)
-            for j in range(len(kukaPos)):
-                observation.append(kukaPos[j])
-            for j in range(len(kukaOrn)):
-                observation.append(kukaOrn[j])
-        for i in range (p.getNumJoints(self.gripperId)):
-            gripperPos,gripperOrn,_,_,_,_ = p.getLinkState(self.gripperId, i)
-            for j in range(len(gripperPos)):
-                observation.append(gripperPos[j])
-            for j in range(len(gripperOrn)):
-                observation.append(gripperOrn[j])
+        #append end effectuator position and orientation
+        endPos, endOrn,_,_,_,_ = p.getLinkState(self.kukaId, 6)
+        for i in range(len(endPos)):
+            observation.append(endPos[i])
+        for i in range(len(endOrn)):
+            observation.append(endOrn[i])
+        observation = np.array(observation)
         return observation
     def _compute_reward(self):
-        cubePos, cubeOrn = p.getBasePositionAndOrientation(self.cubeId)
-        goalPos = [0,0.5,0]
+        #Currently just distance from end to cube, but will change it later
+        cubePos, _ = p.getBasePositionAndOrientation(self.cubeId)
+        endPos,_,_,_,_,_ = p.getLinkState(self.kukaId, 6)
         distance = 0
-        for i in range(len(cubePos)):
-            distance += (cubePos[0]-goalPos[0])**2
-        distance = math.sqrt(distance)
+        cubePos = np.array(cubePos)
+        endPos = np.array(endPos)
+        distance = np.linalg.norm(cubePos-endPos)
         return 1/distance
     def _compute_done(self):
         reward = self._compute_reward()
-        return reward>1000 or self._envStepCounter >= 45000
+        return reward>1000 or self._envStepCounter >= 1000
     def _seed(self, seed = None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]

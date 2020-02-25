@@ -42,7 +42,7 @@ try:
     model = PPO1.load('ppo1_nailbot', env = env)
 except:
     print("Could not find ppo1_nailbot file, creating new one")
-total_timesteps = 100000
+total_timesteps = 50000
 model.learn(total_timesteps=total_timesteps)
 #save model
 model.save('ppo1_nailbot')
