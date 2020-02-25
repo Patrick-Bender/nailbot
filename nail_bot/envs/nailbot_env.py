@@ -82,7 +82,7 @@ class NailbotEnv(gym.GoalEnv):
     def _render(self, mode = 'human', close=False):
         pass
     def _assign_target_position(self, action):
-        p.setJointMotorControlArray(bodyUniqueId = self.kukaId, jointIndices = range(p.getNumJoints(self.kukaId)), controlMode = p.POSITION_CONTROL, targetPositions = action[:p.getNumJoints(self.kukaId)], forces = p.getNumJoints(self.kukaId)*[50])
+        p.setJointMotorControlArray(bodyUniqueId = self.kukaId, jointIndices = range(p.getNumJoints(self.kukaId)), controlMode = p.POSITION_CONTROL, targetPositions = action[:p.getNumJoints(self.kukaId)], forces = p.getNumJoints(self.kukaId)*[60])
         p.setJointMotorControlArray(bodyUniqueId = self.gripperId, jointIndices = range(p.getNumJoints(self.gripperId)), controlMode = p.POSITION_CONTROL, targetPositions = action[p.getNumJoints(self.kukaId):p.getNumJoints(self.kukaId)+p.getNumJoints(self.gripperId)])
         return(p.getNumJoints(self.kukaId)+1, p.getNumJoints(self.kukaId)+p.getNumJoints(self.gripperId), p.getNumJoints(self.gripperId))
     def _compute_observation(self):
