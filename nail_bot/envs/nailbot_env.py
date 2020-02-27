@@ -53,7 +53,7 @@ class NailbotEnv(gym.GoalEnv):
         self._assign_target_position(action)
         for i in range(100):
             p.stepSimulation()
-            #time.sleep(1./240.)
+            time.sleep(1./240.)
         self._observation = self._compute_observation()
         reward = self._compute_reward()
         done = self._compute_done()
@@ -123,14 +123,21 @@ class NailbotEnv(gym.GoalEnv):
         observation = np.array(observation)
         return observation
     def _compute_reward(self):
-        #Currently just distance from end to cube, but will change it later
+        #Will get a small reward from being near cube, a medium reward for each gripper tip touching it, and a large reward for getting it close to the goal
         cubePos, _ = p.getBasePositionAndOrientation(self.cubeId)
         endPos,_,_,_,_,_ = p.getLinkState(self.kukaId, 6)
+        goalPos = [0,0.5,0]
+        gripperContact = 0
+        contact = p.getContactPoints(self.cubeId, self.gripperId)
+        if len(contact):
+            gripperContact = 1
+            print("contact")
         distance = 0
         cubePos = np.array(cubePos)
         endPos = np.array(endPos)
         distance = np.linalg.norm(cubePos-endPos)
-        return 1/distance
+        reward = min(1/distance, 20) + gripperContact*100
+        return reward
     def _compute_done(self):
         reward = self._compute_reward()
         return reward>1000 or self._envStepCounter >= 1000

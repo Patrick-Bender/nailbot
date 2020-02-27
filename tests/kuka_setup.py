@@ -25,18 +25,17 @@ print(kuka_gripper)
 print("Kuka # joints: %d " % p.getNumJoints(kuka))
 
 for i in range(p.getNumJoints(kuka)):
-    print(p.getJointInfo(kuka, i))
+    print(p.getJointInfo(kuka, i)) 
 
 
-'''
 print("Gripper # joints: %d" % p.getNumJoints(kuka_gripper))
 print("Gripper joint types:")
 for i in range(p.getNumJoints(kuka_gripper)):
-    print(p.getJointInfo(kuka_gripper, i)[8])
+    print(p.getJointInfo(kuka_gripper, i))
 jointPositions = [
     0.000000, -0.011130, -0.206421, 0.205143, -0.009999, 0.000000, -0.010055, 0.000000
 ]
-'''
+
 for jointIndex in range(p.getNumJoints(kuka_gripper)):
   p.resetJointState(kuka_gripper, jointIndex, jointPositions[jointIndex])
   p.setJointMotorControl2(kuka_gripper, jointIndex, p.POSITION_CONTROL, jointPositions[jointIndex],0)

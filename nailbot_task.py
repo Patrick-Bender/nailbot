@@ -37,7 +37,7 @@ policy_kwargs = dict(act_fun=tf.nn.leaky_relu, net_arch=[256,256,256,256])
 #Create and train the model
 env = gym.make('nailbot-v0')
 env = Monitor(env, log_dir, allow_early_resets=True)
-model = PPO1(MlpPolicy, env, policy_kwargs=policy_kwargs, verbose=1)
+model = PPO1(MlpPolicy, env, verbose=1)#, policy_kwargs = policy_kwargs)
 try:
     model = PPO1.load('ppo1_nailbot', env = env)
 except:
@@ -51,8 +51,6 @@ print("Done training")
 #show plot results
 results_plotter.plot_results([log_dir], total_timesteps, results_plotter.X_TIMESTEPS, 'PPO1 Nailbot')
 plt.show()
-
-        
 '''
 if __name__=='__main__':
         main()
