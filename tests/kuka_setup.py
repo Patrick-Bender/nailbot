@@ -23,7 +23,6 @@ kuka_gripper = p.loadSDF("gripper/wsg50_one_motor_gripper_new_free_base.sdf")[0]
 print("kuka gripper=")
 print(kuka_gripper)
 print("Kuka # joints: %d " % p.getNumJoints(kuka))
-
 for i in range(p.getNumJoints(kuka)):
     print(p.getJointInfo(kuka, i)) 
 

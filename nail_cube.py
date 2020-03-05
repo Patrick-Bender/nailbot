@@ -39,7 +39,7 @@ def openGripper(gripperID):
     p.setJointMotorControl2(gripperID, 6, p.POSITION_CONTROL, targetPosition = targetPosition)
     stepSim(200)
 
-def moveToPos(kukaID, endeffector, targetPos, targetOrn, k = 3):
+def moveToPos(kukaID, endeffector, targetPos, targetOrn, k = 1000):
     currentPos = p.getLinkState(kukaID, endeffector)[0]
     currentOrn = p.getLinkState(kukaID, endeffector)[1]
     targetPos = np.array(targetPos) + np.array([0,0,0.35])
@@ -48,8 +48,8 @@ def moveToPos(kukaID, endeffector, targetPos, targetOrn, k = 3):
         #converts the orientation to euler angles for the purpose of averaging then turns them back into quaternions
         orn = p.getQuaternionFromEuler((np.array(p.getEulerFromQuaternion(targetOrn)) + np.array(p.getEulerFromQuaternion(currentOrn)))/2)
         targetPositions = p.calculateInverseKinematics(kukaID, 6, pos, targetOrientation = orn)
-        p.setJointMotorControlArray(bodyUniqueId = kukaID, jointIndices=range(num_joints), controlMode = p.POSITION_CONTROL, targetPositions = targetPositions, forces = num_joints*[50])
-        stepSim(200) 
+        p.setJointMotorControlArray(bodyUniqueId = kukaID, jointIndices=range(num_joints), controlMode = p.POSITION_CONTROL, targetPositions = targetPositions, forces = num_joints*[60])
+        stepSim(2) 
         currentPos = pos
         currentOrn = orn
 def activateNailgun(nailGunID, object1ID):
@@ -96,13 +96,13 @@ cubePos = [-0.5,0,0]
 straightUp = p.getQuaternionFromEuler([0,0,0])
 kukaPos = [0,0,0]
 kuka2Pos = [0,1,0]
-nailGunPos = [0,0.5,0.1]
+nailGunPos = [0,0.5,0.2]
 roof1ID = p.loadURDF("urdfs/roof.urdf", [-0.5,0,0.1], straightUp)
 roof2ID = p.loadURDF("urdfs/roof.urdf", [0.5,1,0.1], straightUp)
 kukaID = p.loadURDF("kuka_iiwa/model.urdf", kukaPos, straightUp)
 kuka2ID = p.loadURDF("kuka_iiwa/model.urdf", kuka2Pos, straightUp)
-nailGunID = p.loadURDF('tests/nailgun.urdf', nailGunPos, straightUp)
-jointPositions = [0,0,0,1.57,0,-1.04,0]
+nailGunID = p.loadURDF('urdfs/nailgun.urdf', nailGunPos, straightUp)
+jointPositions = [-0,0,0,1.57,0,-1.04,0]
 for jointIndex in range(p.getNumJoints(kukaID)):
     p.resetJointState(kukaID, jointIndex, jointPositions[jointIndex])
     p.setJointMotorControl2(kukaID, jointIndex, p.POSITION_CONTROL, targetPosition = jointPositions[jointIndex])
@@ -136,13 +136,16 @@ closeGripper(gripper2ID, roof2ID)
 moveToPos(kukaID, 6, [-0.5,0,0.5], p.getQuaternionFromEuler([3.14,0,0]))
 moveToPos(kuka2ID, 6, [0.5,1,0.5], p.getQuaternionFromEuler([3.14,0,0]))
 moveToPos(kukaID, 6, [0,0.5,0.5], p.getQuaternionFromEuler([3.14,0,0]))
+moveToPos(kukaID, 6, [-0.4,0.5,0.5], p.getQuaternionFromEuler([3.14/2,3.14/4,0]))
+moveToPos(kukaID, 6, [-0.4,0.49,-0.1], p.getQuaternionFromEuler([0,3.14/2,0]), 5)
 moveToPos(kuka2ID, 6, [0,0.5,0.5], p.getQuaternionFromEuler([3.14,0,0]))
-moveToPos(kukaID, 6, [-0.2,0.49,-0.13], p.getQuaternionFromEuler([0,3.14/2,0]), 5)
-moveToPos(kuka2ID, 6, [0.2,0.51,-0.1], p.getQuaternionFromEuler([0,-3.14/2,0]), 5)
-#fix second kuka orientation
-#add in activate nailgun
-#think about moving the kuka arms a little farther back
+moveToPos(kuka2ID, 6, [0.2, 0.6, 0.3], p.getQuaternionFromEuler([3.14/2, -3.14/4,0]))
+moveToPos(kuka2ID, 6, [0.4,0.51,0], p.getQuaternionFromEuler([0,-3.14/2,0]), 5)
 
+
+activateNailgun(nailGunID, roof1ID)
+#think about moving the kuka arms a little farther back
+#something is fucked up about the orientation change, it's way to fast
 
 
 while True:
