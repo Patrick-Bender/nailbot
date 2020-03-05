@@ -32,7 +32,7 @@ def getAngleInterpolation(bodyID, finalAngles, k=1000):
     targetAngles = np.zeros((k, num_joints))
     targetAngles[0] = startingAngles
     for i in range(1,k+1):
-        targetAngles[i-1] = startingAngles + finalAngles*(i/k)
+        targetAngles[i-1] = startingAngles + (finalAngles-startingAngles)*(i/k)
     return targetAngles
 
 physicsClient = p.connect(p.GUI)
@@ -49,6 +49,7 @@ for q in range(5):
     finalPos, finalOrn = randomPosAndOrn()
     finalAngles = p.calculateInverseKinematics(kukaID, 6, finalPos, finalOrn)
     targetAngles = getAngleInterpolation(kukaID, finalAngles, num_iterations)
+    print(targetAngles[0], finalAngles)
     for i in range(num_iterations):
         p.setJointMotorControlArray(bodyUniqueId = kukaID, jointIndices = range(num_joints), controlMode = p.POSITION_CONTROL, targetPositions = targetAngles[i], forces = num_joints*[100])
         for j in range(1):
