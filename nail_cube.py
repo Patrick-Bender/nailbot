@@ -3,19 +3,12 @@ import pybullet_data
 
 import numpy as np
 import time
+from math import ceil
 
-def toCube(kukaID, endEffector, cubePos, orn):
-    endPos,_,_,_,_,_ = p.getLinkState(kukaID, endEffector)
-    num_joints = p.getNumJoints(kukaID)
-    pos = np.array(cubePos)+np.array([0,0,0.3])
-    pos = np.array((np.array(endPos)+pos)/2)
-    targetPositions = p.calculateInverseKinematics(kukaID, 6, pos, targetOrientation = orn)
-    p.setJointMotorControlArray(bodyUniqueId = kukaID, jointIndices=range(num_joints), controlMode = p.POSITION_CONTROL, targetPositions = targetPositions, forces = num_joints*[100])
-    return p.calculateInverseKinematics(kukaID, endEffector, pos, targetOrientation = orn)
 def stepSim(k):
     for j in range(k):
         p.stepSimulation()
-        time.sleep(1./240.)
+        #time.sleep(1./240.)
 def closeGripper(gripperID, targetID):
     contact = p.getContactPoints(gripperID, targetID)
     fourPos = p.getJointState(gripperID, 4)[0]
@@ -30,8 +23,9 @@ def closeGripper(gripperID, targetID):
     p.setJointMotorControl2(gripperID, 6, p.VELOCITY_CONTROL, targetVelocity = 0)
     fourPos = p.getJointState(gripperID, 4)[0]
     sixPos = p.getJointState(gripperID, 6)[0]
-    p.setJointMotorControl2(gripperID, 4, p.POSITION_CONTROL, targetPosition = fourPos + 0.005)
-    p.setJointMotorControl2(gripperID, 6, p.POSITION_CONTROL, targetPosition = sixPos + 0.005)
+    pos = max(fourPos, sixPos)
+    p.setJointMotorControl2(gripperID, 4, p.POSITION_CONTROL, targetPosition = pos + 0.0125, force = 100)
+    p.setJointMotorControl2(gripperID, 6, p.POSITION_CONTROL, targetPosition = pos + 0.0125, force = 100)
 
 def openGripper(gripperID):
     targetPosition = 0
@@ -39,19 +33,14 @@ def openGripper(gripperID):
     p.setJointMotorControl2(gripperID, 6, p.POSITION_CONTROL, targetPosition = targetPosition)
     stepSim(200)
 
-def moveToPos(kukaID, endeffector, targetPos, targetOrn, k = 1000):
-    currentPos = p.getLinkState(kukaID, endeffector)[0]
-    currentOrn = p.getLinkState(kukaID, endeffector)[1]
-    targetPos = np.array(targetPos) + np.array([0,0,0.35])
-    for i in range(k):
-        pos = (np.array(targetPos) + np.array(currentPos))/2
-        #converts the orientation to euler angles for the purpose of averaging then turns them back into quaternions
-        orn = p.getQuaternionFromEuler((np.array(p.getEulerFromQuaternion(targetOrn)) + np.array(p.getEulerFromQuaternion(currentOrn)))/2)
-        targetPositions = p.calculateInverseKinematics(kukaID, 6, pos, targetOrientation = orn)
-        p.setJointMotorControlArray(bodyUniqueId = kukaID, jointIndices=range(num_joints), controlMode = p.POSITION_CONTROL, targetPositions = targetPositions, forces = num_joints*[60])
-        stepSim(2) 
-        currentPos = pos
-        currentOrn = orn
+def quaternion_multiply(quaternion1, quaternion0):
+    w0, x0, y0, z0 = quaternion0
+    w1, x1, y1, z1 = quaternion1
+    return np.array([-x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0,
+                     x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
+                     -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
+                     x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0], dtype=np.float64)
+
 def activateNailgun(nailGunID, object1ID):
     #check to see if they're touching
     gunContact = p.getContactPoints(nailGunID, object1ID)
@@ -59,9 +48,9 @@ def activateNailgun(nailGunID, object1ID):
         print('No Contact')
         return False
     #use ray tracing to determine locations of constrain
-    rayPos = np.array(gunContact[0][6])+np.array([0,0,0.005])
+    rayPos = np.array(gunContact[0][6])+np.array([0,0,0.05])
     rayOrn = np.array(gunContact[0][7])
-    rayDist = 0.1
+    rayDist = 0.25
     #rayOrn = np.array([0,0,1])
     #Check and see if the ray intersects both objects
     rayTest = p.rayTest(rayPos, rayPos + rayDist*rayOrn)[0]
@@ -77,17 +66,44 @@ def activateNailgun(nailGunID, object1ID):
     except:
         print("Nothing to nail the object to")
         return False
-    print(parentRefCOM, [0,0,0.025])
-    print(childRefCOM, [0,0,-0.025])
-    #Add constraint
-    constraintID = p.createConstraint(object1ID, -1, hitID, -1, p.JOINT_FIXED, [0,0,0], parentRefCOM, childRefCOM)
-    #Add in failsafe in case the ray does not intersect anything
+    #these are correct, need to figure out a way to do this generically
+    parentRefCOM = [-0.0125, -0.0375, 0]
+    childRefCOM = [0,0.05,0]
+    childFrameOrn = p.getQuaternionFromEuler([0,3.14,-3.14/2])
+    #Add constrain
+    constraintID = p.createConstraint(object1ID, -1, hitID, -1, p.JOINT_FIXED, hitPos, parentRefCOM, childRefCOM, childFrameOrientation = childFrameOrn)
     print("Finished")
     print(p.getConstraintInfo(constraintID))
     return constraintID
 
+def getAngleInterpolation(bodyID, finalAngles, k=1000):
+    #starting angles are the angles that you begin at
+    #final angles are the angles you want to end at
+    #target angles is the big array that has the interpolation of all the angles between the starting and final angles
+    num_joints = p.getNumJoints(bodyID)
+    jointStates= p.getJointStates(bodyID, range(num_joints))
+    startingAngles = []
+    for i in range(num_joints):
+        startingAngles.append(p.getJointState(bodyID, i)[0])
+    startingAngles = np.array(startingAngles)
+    finalAngles = np.array(finalAngles)
+    targetAngles = np.zeros((k, num_joints))
+    targetAngles[0] = startingAngles
+    for i in range(1,k+1):
+        targetAngles[i-1] = startingAngles + (finalAngles-startingAngles)*(i/k)
+    return targetAngles
 
+def moveToPos(kukaID, finalPos, finalOrn, k = 500):
+    num_joints = p.getNumJoints(kukaID)
+    finalAngles = p.calculateInverseKinematics(kukaID, 6, finalPos, finalOrn)
+    targetAngles = getAngleInterpolation(kukaID, finalAngles, k)
+    for i in range(k):
+        p.setJointMotorControlArray(bodyUniqueId = kukaID, jointIndices = range(num_joints), controlMode = p.POSITION_CONTROL, targetPositions = targetAngles[i], forces = num_joints*[100])
+        for j in range(ceil(1000/k)):
+            p.stepSimulation()
+            #time.sleep(1./240.)
 
+#setup
 physicsClient = p.connect(p.GUI)
 p.setAdditionalSearchPath(pybullet_data.getDataPath())
 p.setGravity(0,0,-9.8)
@@ -97,8 +113,8 @@ straightUp = p.getQuaternionFromEuler([0,0,0])
 kukaPos = [0,0,0]
 kuka2Pos = [0,1,0]
 nailGunPos = [0,0.5,0.2]
-roof1ID = p.loadURDF("urdfs/roof.urdf", [-0.5,0,0.1], straightUp)
-roof2ID = p.loadURDF("urdfs/roof.urdf", [0.5,1,0.1], straightUp)
+roof1ID = p.loadURDF("urdfs/roof.urdf", [-0.6,0,0.15], straightUp)
+roof2ID = p.loadURDF("urdfs/roof.urdf", [0.6,1,0.15], straightUp)
 kukaID = p.loadURDF("kuka_iiwa/model.urdf", kukaPos, straightUp)
 kuka2ID = p.loadURDF("kuka_iiwa/model.urdf", kuka2Pos, straightUp)
 nailGunID = p.loadURDF('urdfs/nailgun.urdf', nailGunPos, straightUp)
@@ -122,73 +138,49 @@ kuka_cid = p.createConstraint(kukaID, 6, gripperID, 0, p.JOINT_FIXED, [0,0,0], [
 kuka2_cid = p.createConstraint(kuka2ID, 6, gripper2ID, 0, p.JOINT_FIXED, [0,0,0], [0,0,0.05], [0,0,0])
 stepSim(20)
 num_joints = p.getNumJoints(kukaID)
-#moveToPos(kukaID, 6, np.array([-0.5,0,0.1]) + np.array([0,0,0.2]), p.getQuaternionFromEuler([3.14,0,0]))
-for j in range(3):
-    roof1Pos, _ = p.getBasePositionAndOrientation(roof1ID)
-    toCube(kukaID, 6, roof1Pos, p.getQuaternionFromEuler([3.14,0,0]))
-    roof2Pos, _ = p.getBasePositionAndOrientation(roof2ID)
-    toCube(kuka2ID, 6, roof2Pos, p.getQuaternionFromEuler([3.14,0,0]))
-    stepSim(200)
+roof1Pos, _ = p.getBasePositionAndOrientation(roof1ID)
+roof2Pos, _ = p.getBasePositionAndOrientation(roof2ID)
 
+#move to grasp roofs
+moveToPos(kukaID, np.array(roof1Pos) + np.array([0,0,0.35]), p.getQuaternionFromEuler([3.14,0,3.14]),50)
+moveToPos(kuka2ID, np.array(roof2Pos) + np.array([0,0,0.35]), p.getQuaternionFromEuler([3.14,0,3.14]),50)
+
+#close grippers
 closeGripper(gripperID, roof1ID)
 closeGripper(gripper2ID, roof2ID)
 
-moveToPos(kukaID, 6, [-0.5,0,0.5], p.getQuaternionFromEuler([3.14,0,0]))
-moveToPos(kuka2ID, 6, [0.5,1,0.5], p.getQuaternionFromEuler([3.14,0,0]))
-moveToPos(kukaID, 6, [0,0.5,0.5], p.getQuaternionFromEuler([3.14,0,0]))
-moveToPos(kukaID, 6, [-0.4,0.5,0.5], p.getQuaternionFromEuler([3.14/2,3.14/4,0]))
-moveToPos(kukaID, 6, [-0.4,0.49,-0.1], p.getQuaternionFromEuler([0,3.14/2,0]), 5)
-moveToPos(kuka2ID, 6, [0,0.5,0.5], p.getQuaternionFromEuler([3.14,0,0]))
-moveToPos(kuka2ID, 6, [0.2, 0.6, 0.3], p.getQuaternionFromEuler([3.14/2, -3.14/4,0]))
-moveToPos(kuka2ID, 6, [0.4,0.51,0], p.getQuaternionFromEuler([0,-3.14/2,0]), 5)
+#move up
+moveToPos(kukaID, [-0.5,0,0.7], p.getQuaternionFromEuler([3.14,0,3.14]))
+moveToPos(kuka2ID, [0.5,1,0.7], p.getQuaternionFromEuler([3.14,0,3.14]))
 
+#move closer to nailgun and orient planks
+moveToPos(kuka2ID, [0.35,0.5,0.7], p.getQuaternionFromEuler([-3.14/2,0,3.14/2]))
+moveToPos(kukaID, [-0.5,0.3,0.3], p.getQuaternionFromEuler([3.14,-3.14/2,0]))
+moveToPos(kukaID, [-0.35,0.45,0.5], p.getQuaternionFromEuler([3.14,-3.14/2,0]))
+
+
+#lower plank
+moveToPos(kukaID, [-0.35,0.45,0.3125], p.getQuaternionFromEuler([3.14,-3.14/2,0]))
+moveToPos(kuka2ID, [0.35,0.5,0.3625], p.getQuaternionFromEuler([-3.14/2,0,3.14/2]))
 
 activateNailgun(nailGunID, roof1ID)
-#think about moving the kuka arms a little farther back
-#something is fucked up about the orientation change, it's way to fast
+
+openGripper(gripper2ID)
+#move kuka 2 out of the way
+moveToPos(kuka2ID, [0.4,0.5,0.5], p.getQuaternionFromEuler([-3.14/2,0,3.14/2]))
+moveToPos(kuka2ID, [0.5,1,0.7], p.getQuaternionFromEuler([3.14,0,3.14]))
+
+#move nailed thing front
+
+moveToPos(kukaID, [0.4,0.3,0.5], p.getQuaternionFromEuler([3.14,0,0]))
+moveToPos(kukaID, [0.5,0.2,0.3], p.getQuaternionFromEuler([3.14,0,0]))
+openGripper(gripperID)
+moveToPos(kukaID, [0.5,0.2,0.7], p.getQuaternionFromEuler([3.14,0,0]))
+moveToPos(kukaID, [-0.5,0.3,0.3], p.getQuaternionFromEuler([3.14,-3.14/2,0]))
 
 
 while True:
     p.stepSimulation()
+    time.sleep(1./240.)
 p.disconnect()
-'''
-def getAngleInterpolation(bodyID, finalAngles, k=1000):
-    #starting angles are the angles that you begin at
-    #final angles are the angles you want to end at
-    #target angles is the big array that has the interpolation of all the angles between the starting and final angles
-    num_joints = p.getNumJoints(bodyID)
-    jointStates= p.getJointStates(bodyID, range(num_joints))
-    startingAngles = []
-    for i in range(num_joints):
-        startingAngles.append(p.getJointState(bodyID, i)[0])
-        #startingAngles.append(jointStates[i][0])
-    startingAngles = np.array(startingAngles)
-    finalAngles = np.array(finalAngles)
-    targetAngles = np.zeros((k, num_joints))
-    targetAngles[0] = startingAngles
-    for i in range(1,k+1):
-        targetAngles[i-1] = startingAngles + finalAngles*(i/k)
-    return targetAngles
-
-physicsClient = p.connect(p.GUI)
-p.setAdditionalSearchPath(pybullet_data.getDataPath())
-p.setGravity(0,0,-9.8)
-planeID = p.loadURDF("plane.urdf")
-kukaStartPos=[0,0,0]
-kukaStartOrn = p.getQuaternionFromEuler([0,0,0])
-kukaID = p.loadURDF('kuka_iiwa/model.urdf', kukaStartPos, kukaStartOrn)
-#each i gives a different random pos and orn for the arm to get to
-num_joints = p.getNumJoints(kukaID)
-num_iterations = 1000
-for q in range(5):
-    finalPos, finalOrn = randomPosAndOrn()
-    finalAngles = p.calculateInverseKinematics(kukaID, 6, finalPos, finalOrn)
-    targetAngles = getAngleInterpolation(kukaID, finalAngles, num_iterations)
-    for i in range(num_iterations):
-        p.setJointMotorControlArray(bodyUniqueId = kukaID, jointIndices = range(num_joints), controlMode = p.POSITION_CONTROL, targetPositions = targetAngles[i], forces = num_joints*[100])
-        for j in range(1):
-            p.stepSimulation()
-            time.sleep(1./240.)
-p.disconnect()
-'''
 

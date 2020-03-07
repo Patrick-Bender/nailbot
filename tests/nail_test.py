@@ -30,6 +30,8 @@ def activateNailgun(nailGunID, object1ID):
         return False
     print(parentRefCOM, [0,0,0.025])
     print(childRefCOM, [0,0,-0.025])
+    parentRefCOM = [-0.025,0,0]
+    childRefCOM = [0.025,0,0]
     #Add constraint
     constraintID = p.createConstraint(object1ID, -1, hitID, -1, p.JOINT_FIXED, [0,0,0], parentRefCOM, childRefCOM)
     #Add in failsafe in case the ray does not intersect anything
@@ -41,8 +43,8 @@ physicsClient = p.connect(p.GUI)
 p.setAdditionalSearchPath(pybullet_data.getDataPath())
 p.setGravity(0,0,-9.8)
 planeID = p.loadURDF("plane.urdf")
-cubeID = p.loadURDF('cube_small.urdf', [0,0,0.225], p.getQuaternionFromEuler([0,0,0]))
-cube2ID = p.loadURDF('cube_small.urdf', [0,0,0.275], p.getQuaternionFromEuler([0,0,0]))
+cubeID = p.loadURDF('../urdfs/roof.urdf', [0,0,0.225], p.getQuaternionFromEuler([0,3.14/2,0]))
+cube2ID = p.loadURDF('../urdfs/roof.urdf', [0,0,0.275], p.getQuaternionFromEuler([0,3.14/2,0]))
 nailgunID = p.loadURDF('nailgun.urdf', [0,0,0.1], p.getQuaternionFromEuler([0,0,0]))
 print("cubeID"+str(cubeID))
 #Touches the cube to see if it's nailed together or not
