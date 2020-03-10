@@ -33,43 +33,25 @@ def openGripper(gripperID):
     p.setJointMotorControl2(gripperID, 6, p.POSITION_CONTROL, targetPosition = targetPosition)
     stepSim(200)
 
-def quaternion_multiply(quaternion1, quaternion0):
-    w0, x0, y0, z0 = quaternion0
-    w1, x1, y1, z1 = quaternion1
-    return np.array([-x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0,
-                     x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
-                     -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
-                     x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0], dtype=np.float64)
 
-def activateNailgun(nailGunID, object1ID):
+def activateNailgun(nailGunID, object1ID, parentRefCOM, childRefCOM, childFrameOrn=[0,0,0]):
     #check to see if they're touching
     gunContact = p.getContactPoints(nailGunID, object1ID)
     if not len(gunContact):
         print('No Contact')
         return False
+    #get rid of the nasty contact points-just use COM of nailgun + some z component to get pos, and just use straight up as orn
     #use ray tracing to determine locations of constrain
-    rayPos = np.array(gunContact[0][6])+np.array([0,0,0.05])
-    rayOrn = np.array(gunContact[0][7])
+    gunPos, _ = p.getBasePositionAndOrientation(nailGunID)
+    rayPos = np.array(gunPos)+np.array([0,0,0.165])
+    rayOrn = np.array([0,0,1])
     rayDist = 0.25
     #rayOrn = np.array([0,0,1])
     #Check and see if the ray intersects both objects
     rayTest = p.rayTest(rayPos, rayPos + rayDist*rayOrn)[0]
     hitID = rayTest[0]
     hitPos = np.array(rayTest[3])
-    hitNorm = np.array(rayTest[4])
-    #Get centers of mass for the objects, and find the center of mass relative to the joint frame
-    try:
-        parentCOM = np.array(p.getBasePositionAndOrientation(object1ID)[0])
-        childCOM = np.array(p.getBasePositionAndOrientation(hitID)[0])
-        parentRefCOM = hitPos - parentCOM
-        childRefCOM = hitPos - childCOM
-    except:
-        print("Nothing to nail the object to")
-        return False
-    #these are correct, need to figure out a way to do this generically
-    parentRefCOM = [-0.0125, -0.0375, 0]
-    childRefCOM = [0,0.05,0]
-    childFrameOrn = p.getQuaternionFromEuler([0,3.14,-3.14/2])
+    
     #Add constrain
     constraintID = p.createConstraint(object1ID, -1, hitID, -1, p.JOINT_FIXED, hitPos, parentRefCOM, childRefCOM, childFrameOrientation = childFrameOrn)
     print("Finished")
@@ -93,15 +75,18 @@ def getAngleInterpolation(bodyID, finalAngles, k=1000):
         targetAngles[i-1] = startingAngles + (finalAngles-startingAngles)*(i/k)
     return targetAngles
 
-def moveToPos(kukaID, finalPos, finalOrn, k = 500):
+def moveToPos(kukaID, finalPos, finalOrn, k = 500, s = 0):
+    if s == 0:
+        s = ceil(1000/k)
     num_joints = p.getNumJoints(kukaID)
     finalAngles = p.calculateInverseKinematics(kukaID, 6, finalPos, finalOrn)
     targetAngles = getAngleInterpolation(kukaID, finalAngles, k)
     for i in range(k):
         p.setJointMotorControlArray(bodyUniqueId = kukaID, jointIndices = range(num_joints), controlMode = p.POSITION_CONTROL, targetPositions = targetAngles[i], forces = num_joints*[100])
-        for j in range(ceil(1000/k)):
+        for j in range(s):
             p.stepSimulation()
             #time.sleep(1./240.)
+
 
 #setup
 physicsClient = p.connect(p.GUI)
@@ -138,8 +123,10 @@ kuka_cid = p.createConstraint(kukaID, 6, gripperID, 0, p.JOINT_FIXED, [0,0,0], [
 kuka2_cid = p.createConstraint(kuka2ID, 6, gripper2ID, 0, p.JOINT_FIXED, [0,0,0], [0,0,0.05], [0,0,0])
 stepSim(20)
 num_joints = p.getNumJoints(kukaID)
-roof1Pos, _ = p.getBasePositionAndOrientation(roof1ID)
+roof1Pos, roof1Orn = p.getBasePositionAndOrientation(roof1ID)
 roof2Pos, _ = p.getBasePositionAndOrientation(roof2ID)
+
+print('inital Orientation', p.getQuaternionFromEuler([0,0,0]))
 
 #move to grasp roofs
 moveToPos(kukaID, np.array(roof1Pos) + np.array([0,0,0.35]), p.getQuaternionFromEuler([3.14,0,3.14]),50)
@@ -161,9 +148,9 @@ moveToPos(kukaID, [-0.35,0.45,0.5], p.getQuaternionFromEuler([3.14,-3.14/2,0]))
 
 #lower plank
 moveToPos(kukaID, [-0.35,0.45,0.3125], p.getQuaternionFromEuler([3.14,-3.14/2,0]))
-moveToPos(kuka2ID, [0.35,0.5,0.3625], p.getQuaternionFromEuler([-3.14/2,0,3.14/2]))
+moveToPos(kuka2ID, [0.325,0.5,0.3625], p.getQuaternionFromEuler([-3.14/2,0,3.14/2]))
 
-activateNailgun(nailGunID, roof1ID)
+activateNailgun(nailGunID, roof1ID, [-0.0125,-0.0375,0], [0,0.05,0], p.getQuaternionFromEuler([0,3.14,-3.14/2]))
 
 openGripper(gripper2ID)
 #move kuka 2 out of the way
