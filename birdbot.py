@@ -164,6 +164,14 @@ moveToPos(kukaID, [-0.5,-0.4,0.6], p.getQuaternionFromEuler([3.14,0,0]))
 openGripper(gripperID)
 moveToPos(kukaID, [-0.5,-0.4,0.7], p.getQuaternionFromEuler([3.14,0,0]))
 
+
+
+
+
+
+
+
+
 #load side and bottom
 side1Pos = [0.5,1,0.1]
 side1ID = p.loadURDF("urdfs/side.urdf", side1Pos, straightUp)
@@ -176,7 +184,7 @@ moveToPos(kukaID, [-0.5,0,0.8], p.getQuaternionFromEuler([3.14,0,3.14]))
 moveToPos(kukaID, np.array(bottomPos) + np.array([0.015,0,0.3]), p.getQuaternionFromEuler([3.14,0,3.14]))
 
 moveToPos(kuka2ID, [0.5,1,0.7], p.getQuaternionFromEuler([3.14,0,3.14]))
-moveToPos(kuka2ID, np.array(side1Pos) + np.array([-0.01,0,0.35]), p.getQuaternionFromEuler([3.14,0,3.14]))
+moveToPos(kuka2ID, np.array(side1Pos) + np.array([0,0,0.35]), p.getQuaternionFromEuler([3.14,0,3.14]))
 closeGripper(gripper2ID, side1ID)
 
 #move side and bottom into position
@@ -201,15 +209,53 @@ moveToPos(kuka2ID, [0.325,0.5,0.5], p.getQuaternionFromEuler([-3.14/2,0,3.14/2])
 moveToPos(kukaID, [-0.5,0,0.7], p.getQuaternionFromEuler([3.14,0,0]))
 
 
+
+
+
+
+
+
 #load and grasp second side, reposition bottom+first side, and nail it together
 #load side 2
-side2Pos = [-0.5, 0.0, 0.15]
+side2Pos = [-0.5, 0.1, 0.15]
 side2ID = p.loadURDF("urdfs/side.urdf", side2Pos, straightUp)
 
 #move kuka1 to pick up second side of the roof
-moveToPos(kukaID, np.array(side2Pos) + np.array([0.0861, -0.005,0.35]) , p.getQuaternionFromEuler([3.14,0,0]))
+#moveToPos(kukaID, np.array(side2Pos) + np.array([0.0861, -0.005,0.35]) , p.getQuaternionFromEuler([3.14,0,0]))
+moveToPos(kukaID, np.array(side2Pos) + np.array([0,0,0.5]) , p.getQuaternionFromEuler([3.14,0,0]))
+moveToPos(kukaID, np.array(side2Pos) + np.array([0,0,0.3]) , p.getQuaternionFromEuler([3.14,0,0]))
 closeGripper(gripperID, side2ID)
 moveToPos(kukaID, [-0.5, 0, 0.7], p.getQuaternionFromEuler([3.14, 0, 0]))
+
+
+#drop bottom + side1 to reposition it
+'''
+moveToPos(kuka2ID, [0.5,0.6,0.7], p.getQuaternionFromEuler([-3.14/2,0,3.14/2]))
+moveToPos(kuka2ID, [0.5,0.6,0.6], p.getQuaternionFromEuler([3.14,0,0]))
+openGripper(gripper2ID)
+stepSim(200)
+side1Pos, _ = p.getBasePositionAndOrientation(side1ID)
+moveToPos(kuka2ID, np.array(side1Pos) + np.array([0,-0.01,0.35]) , p.getQuaternionFromEuler([3.14,0,0]))
+closeGripper(gripper2ID, side1ID)
+moveToPos(kuka2ID, [0.5,0.6,0.6], p.getQuaternionFromEuler([3.14,0,0]))
+moveToPos(kuka2ID, [0.325,0.5,0.5], p.getQuaternionFromEuler([-3.14/2,0,3.14/2]))
+'''
+
+#move kuka2 then kuka1 into position, then activate nailgun
+moveToPos(kuka2ID, [0.325,0.55,0.4], p.getQuaternionFromEuler([-3.14/2,0,3.14/2]))
+moveToPos(kuka2ID, [0.325,0.57,0.4], p.getQuaternionFromEuler([-3.14/2,0,3.14/2]))
+
+
+moveToPos(kukaID, [-0.4,0.5,0.7], p.getQuaternionFromEuler([3.14/2*3,0,-3.14/2]))
+moveToPos(kukaID, [-0.35,0.5,0.5], p.getQuaternionFromEuler([3.14/2*3,0,-3.14/2]))
+moveToPos(kukaID, [-0.35,0.5,0.4], p.getQuaternionFromEuler([3.14/2*3,0,-3.14/2]))
+
+activateNailgun(nailGunID, bottomID, [0.025,0.05,0], [-0.0125,-0.1,0], p.getQuaternionFromEuler([0,0,-3.14/2]))
+
+
+
+
+
 
 while True:
     p.stepSimulation()
