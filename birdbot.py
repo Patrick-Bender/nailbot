@@ -24,8 +24,8 @@ def closeGripper(gripperID, targetID):
     fourPos = p.getJointState(gripperID, 4)[0]
     sixPos = p.getJointState(gripperID, 6)[0]
     pos = max(fourPos, sixPos)
-    p.setJointMotorControl2(gripperID, 4, p.POSITION_CONTROL, targetPosition = pos + 0.0125, force = 500)
-    p.setJointMotorControl2(gripperID, 6, p.POSITION_CONTROL, targetPosition = pos + 0.0125, force = 500)
+    p.setJointMotorControl2(gripperID, 4, p.POSITION_CONTROL, targetPosition = pos + 0.0125, force = 10000)
+    p.setJointMotorControl2(gripperID, 6, p.POSITION_CONTROL, targetPosition = pos + 0.0125, force = 10000)
 
 def openGripper(gripperID):
     targetPosition = 0
@@ -325,17 +325,31 @@ moveToPos(kukaID, np.array(backPos) + np.array([0,0,0.6]), p.getQuaternionFromEu
 
 #position kuka 1 and 2 and activate nailgun
 
-
 moveToPos(kuka2ID, [0.75,0.5,0.9], p.getQuaternionFromEuler([3.14,0,0]))
 moveToPos(kuka2ID, [0.175,0.575,0.65], p.getQuaternionFromEuler([3.14,0,0]))
 moveToPos(kuka2ID, [0.11,0.7,0.55], p.getQuaternionFromEuler([3.14,0,0]))
 
+moveToPos(kukaID, [-.2,0.55,0.9], p.getQuaternionFromEuler([3.14,0,0]))
+moveToPos(kukaID, [0,0.545,0.75], p.getQuaternionFromEuler([3.14,0,0]))
+moveToPos(kukaID, [0,0.545,0.7], p.getQuaternionFromEuler([3.14,0,0]))
+activateNailgun(nailGunID, bottomID, [0,0,0], [.1,0,-.075], childFrameOrn = p.getQuaternionFromEuler([0,3.14/2,3.14]), hitID = backID)
+openGripper(gripperID)
+moveToPos(kukaID, [0,0.55,0.9], p.getQuaternionFromEuler([3.14,0,0]))
+moveToPos(kukaID, [-.2,0.55,0.9], p.getQuaternionFromEuler([3.14,0,0]))
+
+#reposition and regrip kuka 2
+moveToPos(kuka2ID, [0.3,1,0.8], p.getQuaternionFromEuler([3.14,0,0]))
+moveToPos(kuka2ID, [1.2,1,0.4], p.getQuaternionFromEuler([3.14,0,0]))
+openGripper(gripper2ID)
+
+moveToPos(kuka2ID, [1.2,1,0.86], p.getQuaternionFromEuler([3.14,0,0]))
+backPos, _ = p.getBasePositionAndOrientation(backID)
+moveToPos(kuka2ID, np.array(backPos) + np.array([-0.25,0,0.8]), p.getQuaternionFromEuler([3.14,-3.14/2,0]))
+moveToPos(kuka2ID, np.array(backPos) + np.array([-0.25,0,0]), p.getQuaternionFromEuler([3.14,-3.14/2,0]))
+
 while True:
     p.stepSimulation()
     time.sleep(1./240.)
-
-moveToPos(kukaID, [-.2,0.5,0.8], p.getQuaternionFromEuler([3.14,0,0]))
-moveToPos(kukaID, [0,0.5,0.65], p.getQuaternionFromEuler([3.14,0,0]))
 
 
 
