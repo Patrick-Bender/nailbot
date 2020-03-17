@@ -76,14 +76,14 @@ def getAngleInterpolation(bodyID, finalAngles, k=1000):
         targetAngles[i-1] = startingAngles + (finalAngles-startingAngles)*(i/k)
     return targetAngles
 
-def moveToPos(kukaID, finalPos, finalOrn, k = 500, s = 0):
+def moveToPos(kukaID, finalPos, finalOrn, k = 500, s = 0, force = 100):
     if s == 0:
         s = ceil(1000/k)
     num_joints = p.getNumJoints(kukaID)
     finalAngles = p.calculateInverseKinematics(kukaID, 6, finalPos, finalOrn)
     targetAngles = getAngleInterpolation(kukaID, finalAngles, k)
     for i in range(k):
-        p.setJointMotorControlArray(bodyUniqueId = kukaID, jointIndices = range(num_joints), controlMode = p.POSITION_CONTROL, targetPositions = targetAngles[i], forces = num_joints*[100])
+        p.setJointMotorControlArray(bodyUniqueId = kukaID, jointIndices = range(num_joints), controlMode = p.POSITION_CONTROL, targetPositions = targetAngles[i], forces = num_joints*[force])
         for j in range(s):
             p.stepSimulation()
             #time.sleep(1./240.)
@@ -317,7 +317,8 @@ backID = p.loadURDF("urdfs/front.urdf", backPos, straightUp)
 backAtticID = p.loadURDF("urdfs/attic.urdf", [-0.5, 0, 0.1], straightUp)
 backConstraintID = p.createConstraint(backID, -1, backAtticID, -1, p.JOINT_FIXED, [0,0,0], [0,0,0.05], [0,0,0], childFrameOrientation = p.getQuaternionFromEuler([3.14/4,0,0]))
 handleID = p.loadURDF("urdfs/handle.urdf", [-0.55, 0, 0.05], straightUp)
-p.createConstraint(backID, -1, handleID, -1, p.JOINT_FIXED, [0,0,0], [-0.05, 0, -0.025], [0,0,0], childFrameOrientation = p.getQuaternionFromEuler([0, 3.14/2, 0]))
+handleConstraintID = p.createConstraint(backID, -1, handleID, -1, p.JOINT_FIXED, [0,0,0], [-0.015, 0, -0.025], [0,0,0], childFrameOrientation = p.getQuaternionFromEuler([0, 3.14/2, 0]))
+p.changeConstraint(handleConstraintID, maxForce = 20000)
 moveToPos(kukaID, np.array(backPos) + np.array([0.025,0,0.6]), p.getQuaternionFromEuler([3.14,0,0]))
 moveToPos(kukaID, np.array(backPos) + np.array([0.025,0,0.325]), p.getQuaternionFromEuler([3.14,0,0]))
 closeGripper(gripperID, backID)
@@ -339,21 +340,51 @@ moveToPos(kukaID, [-.2,0.55,0.9], p.getQuaternionFromEuler([3.14,0,0]))
 
 #reposition and regrip kuka 2
 moveToPos(kuka2ID, [0.3,1,0.8], p.getQuaternionFromEuler([3.14,0,0]))
-moveToPos(kuka2ID, [1.2,1,0.4], p.getQuaternionFromEuler([3.14,0,0]))
+moveToPos(kuka2ID, [0.7,1,0.4], p.getQuaternionFromEuler([3.14,0,0]))
+openGripper(gripper2ID)
+moveToPos(kuka2ID, [0.7,1,0.86], p.getQuaternionFromEuler([3.14,0,0]))
+side1Pos, _ = p.getBasePositionAndOrientation(side1ID)
+moveToPos(kuka2ID, np.array(side1Pos) + np.array([-.15,-0.05,0.8]), p.getQuaternionFromEuler([3.14,0,3.14/2]))
+moveToPos(kuka2ID, np.array(side1Pos) + np.array([0,0,0.4]), p.getQuaternionFromEuler([3.14,0,3.14/2]))
+moveToPos(kuka2ID, np.array(side1Pos) + np.array([0,0,0.2525]), p.getQuaternionFromEuler([3.14,0,3.14/2]))
+closeGripper(gripper2ID, side1ID)
+moveToPos(kuka2ID, [0.8,1,0.8], p.getQuaternionFromEuler([3.14,0,3.14/2]))
+moveToPos(kuka2ID, [0.45,1,0.9], p.getQuaternionFromEuler([-3.14/2,0,-3.14/2]), k = 1000, s = 3, force = 200)
+moveToPos(kuka2ID, [0.45,1,0.3], p.getQuaternionFromEuler([-3.14/2,0,-3.14/2]), k = 1000, s = 3, force = 200)
+moveToPos(kuka2ID, [0.45,1,0.1], p.getQuaternionFromEuler([-3.14/2,0,-3.14/2]), force = 200)
 openGripper(gripper2ID)
 
-moveToPos(kuka2ID, [1.2,1,0.86], p.getQuaternionFromEuler([3.14,0,0]))
-backPos, _ = p.getBasePositionAndOrientation(backID)
-moveToPos(kuka2ID, np.array(backPos) + np.array([-0.25,0,0.8]), p.getQuaternionFromEuler([3.14,-3.14/2,0]))
-moveToPos(kuka2ID, np.array(backPos) + np.array([-0.25,0,0]), p.getQuaternionFromEuler([3.14,-3.14/2,0]))
+moveToPos(kuka2ID, [0.05,1,0.15], p.getQuaternionFromEuler([-3.14/2,0,-3.14/2]))
+moveToPos(kuka2ID, [0.05,0.7,0.3], p.getQuaternionFromEuler([-3.14/2,0,-3.14/4]))
+moveToPos(kuka2ID, [0.5,1,0.8], p.getQuaternionFromEuler([3.14,0,0]))
+stepSim(50)
+handlePos, _ = p.getBasePositionAndOrientation(handleID)
+moveToPos(kuka2ID, np.array(handlePos) + np.array([0.4,0.1,0.65]), p.getQuaternionFromEuler([3.14,0,0]))
+moveToPos(kuka2ID, np.array(handlePos) + np.array([0.375,0,0.42]), p.getQuaternionFromEuler([3.14,0,0]))
+closeGripper(gripper2ID, handleID)
+
+#gasp roof and move it to position
+roof1Pos, _ = p.getBasePositionAndOrientation(roof1ID)
+moveToPos(kukaID, np.array(roof1Pos) + np.array([-0.01,-0.025,0.55]), p.getQuaternionFromEuler([3.14,0,3.14/2]))
+moveToPos(kukaID, np.array(roof1Pos) + np.array([-0.01,-0.025,0.35]), p.getQuaternionFromEuler([3.14,0,3.14/2]))
+closeGripper(gripperID, roof1ID)
+moveToPos(kukaID, [-0.5,0.2,0.7], p.getQuaternionFromEuler([3.14,0,0]))
+moveToPos(kukaID, [-0.5,0.45,0.4], p.getQuaternionFromEuler([-3.14/2,-3.14/4*3,3.14/2*3]))
+moveToPos(kukaID, [-0.35,0.4,0.3], p.getQuaternionFromEuler([-3.14/2,-3.14/4*3,3.14/2*3]))
+
+#lower side, activate nailgun, release grip
+moveToPos(kuka2ID, [0.3,1,0.8], p.getQuaternionFromEuler([3.14,0,0]), force = 200)
+moveToPos(kuka2ID, [0.5,0.5,0.7], p.getQuaternionFromEuler([3.14,3.14/4,0]), force = 200)
+moveToPos(kuka2ID, [0.5,0.5,0.7], p.getQuaternionFromEuler([3.14,3.14/2,0]), force = 200)
+activateNailgun(nailGunID, roof2ID, [-0.02,-0.05,0], [0,0.07,0], p.getQuaternionFromEuler([0,0,-3.14/4]))
+
+
 
 while True:
     p.stepSimulation()
     time.sleep(1./240.)
 
 
-
-#reset kuka 2 pos
 
 
 #grasp handle and reposition
@@ -366,18 +397,6 @@ while True:
 while True:
     p.stepSimulation()
     time.sleep(1./240.)
-#gasp roof and move it to position
-roof1Pos, _ = p.getBasePositionAndOrientation(roof1ID)
-moveToPos(kukaID, np.array(roof1Pos) + np.array([-0.01,0,0.35]), p.getQuaternionFromEuler([3.14,0,0]))
-closeGripper(gripperID, roof1ID)
-moveToPos(kukaID, [-0.5,0.2,0.7], p.getQuaternionFromEuler([3.14,0,0]))
-moveToPos(kukaID, [-0.5,0.45,0.4], p.getQuaternionFromEuler([-3.14/2,-3.14/4*3,3.14/2*3]))
-moveToPos(kukaID, [-0.35,0.4,0.3], p.getQuaternionFromEuler([-3.14/2,-3.14/4*3,3.14/2*3]))
-
-#lower side, activate nailgun, release grip
-moveToPos(kuka2ID, [0.325,0.5,0.4], p.getQuaternionFromEuler([-3.14/2,0,3.14/2]))
-activateNailgun(nailGunID, roof2ID, [-0.02,-0.05,0], [0,0.07,0], p.getQuaternionFromEuler([0,0,-3.14/4]))
-openGripper(gripperID)
 #sideConstraintID = p.createConstraint(gripper2ID, -1, side1ID, -1, p.JOINT_FIXED, [0,0,0], [0,0,0.3], [0,0,0], childFrameOrientation = p.getQuaternionFromEuler([0,0,-3.14/2])) 
 
 
